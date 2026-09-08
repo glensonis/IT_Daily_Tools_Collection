@@ -11,6 +11,14 @@
     pwsh -NoProfile -File .\tests\Run-Tests.ps1
 #>
 
+# $AppDataDir and $RecentPath below are read by the functions dot-sourced from
+# Map-NetworkDrive.ps1, which resolve them through the parent scope at call
+# time. PSScriptAnalyzer only tracks reads within this file, so it reports them
+# as write-only. Suppressed so any future warning from this file is real.
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'AppDataDir',
+    Justification = 'Read by the dot-sourced tool functions through scope, not visible to the analyzer.')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'RecentPath',
+    Justification = 'Read by the dot-sourced tool functions through scope, not visible to the analyzer.')]
 [CmdletBinding()]
 param()
 
