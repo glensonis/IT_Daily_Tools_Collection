@@ -117,6 +117,18 @@ Anything unmapped is shown with its Windows error number and the raw text, so it
 
 ---
 
+## Testing
+
+The script takes a `-Mode` switch so it can be checked automatically:
+
+| Mode | Effect |
+| --- | --- |
+| `Normal` (default) | Opens the window. What the `.bat` launcher uses. |
+| `FunctionsOnly` | Defines the functions and returns without loading WinForms. Dot-source it to test the logic on any OS. |
+| `BuildOnly` | Builds every control but never shows the window. Used by the CI smoke test. |
+
+Run the suite from the repository root with `pwsh -NoProfile -File .\tests\Run-Tests.ps1`.
+
 ## Requirements
 
 - Windows 10/11 with PowerShell 5.1 (built in)

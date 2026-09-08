@@ -19,26 +19,47 @@
 #>
 
 [CmdletBinding()]
-param()
+param(
+    # Normal        - open the window (what the .bat launcher does).
+    # FunctionsOnly - define the functions and return, without touching WinForms.
+    #                 Dot-source with this to unit test the logic on any OS.
+    # BuildOnly     - build the window but do not show it. Windows-only smoke
+    #                 test that every control is constructed correctly.
+    [ValidateSet('Normal', 'FunctionsOnly', 'BuildOnly')]
+    [string] $Mode = 'Normal'
+)
 
 $ErrorActionPreference = 'Stop'
 
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-[System.Windows.Forms.Application]::EnableVisualStyles()
+if ($Mode -ne 'FunctionsOnly') {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+}
 
 # --------------------------------------------------------------------------
 # Paths
 # --------------------------------------------------------------------------
 
-$ScriptDir          = Split-Path -Parent $MyInvocation.MyCommand.Definition
+# $PSScriptRoot is correct whether this file is run or dot-sourced.
+$ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
+
+# Fall back off the environment variables so the file stays dot-sourceable on
+# a non-Windows box for testing. On Windows these always resolve normally.
+$AppDataRoot = if ($env:APPDATA) { $env:APPDATA } else { [Environment]::GetFolderPath('ApplicationData') }
+if (-not $AppDataRoot) { $AppDataRoot = [System.IO.Path]::GetTempPath() }
+$SystemRoot = if ($env:SystemRoot) { $env:SystemRoot } else { 'C:\Windows' }
+
 $SampleSettingsPath = Join-Path $ScriptDir 'settings.sample.json'
 $LocalSettingsPath  = Join-Path $ScriptDir 'settings.json'
-$AppDataDir         = Join-Path $env:APPDATA 'Daily_IT_Tools\Map-NetworkDrive'
+$AppDataDir         = Join-Path $AppDataRoot 'Daily_IT_Tools\Map-NetworkDrive'
 $UserSettingsPath   = Join-Path $AppDataDir 'settings.json'
 $RecentPath         = Join-Path $AppDataDir 'recent.json'
-$NetExe             = Join-Path $env:SystemRoot 'System32\net.exe'
-$CmdKeyExe          = Join-Path $env:SystemRoot 'System32\cmdkey.exe'
+# Built by interpolation, not Join-Path: Join-Path resolves the drive through
+# the PowerShell provider, which fails when this file is dot-sourced on Linux
+# for testing. These are only ever executed on Windows.
+$NetExe             = "$SystemRoot\System32\net.exe"
+$CmdKeyExe          = "$SystemRoot\System32\cmdkey.exe"
 
 # --------------------------------------------------------------------------
 # Settings
@@ -330,6 +351,8 @@ function Save-ServerCredential {
 # --------------------------------------------------------------------------
 # Build the window
 # --------------------------------------------------------------------------
+
+if ($Mode -eq 'FunctionsOnly') { return }
 
 $settings = Get-Settings
 
@@ -638,6 +661,12 @@ $form.Add_Shown({
     }
     if ([string]::IsNullOrWhiteSpace($txtUser.Text)) { $txtUser.Focus() } else { $txtPass.Focus() }
 })
+
+if ($Mode -eq 'BuildOnly') {
+    Write-Output "Built $($form.Controls.Count) controls."
+    $form.Dispose()
+    return
+}
 
 [void]$form.ShowDialog()
 $form.Dispose()

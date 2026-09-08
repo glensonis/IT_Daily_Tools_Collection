@@ -1,5 +1,7 @@
 # Daily IT Tools
 
+[![CI](https://github.com/glensonis/IT_Daily_Tools_Collection/actions/workflows/ci.yml/badge.svg)](https://github.com/glensonis/IT_Daily_Tools_Collection/actions/workflows/ci.yml)
+
 Small Windows tools for everyday office IT tasks. No installer, no dependencies beyond what ships with Windows - double-click a `.bat` and it runs.
 
 ## Tools
@@ -49,12 +51,27 @@ Daily_IT_Tools\
 Per-user state (recent paths, optional user settings) lives in
 `%APPDATA%\Daily_IT_Tools\` and is deliberately outside the repo.
 
+## Tests
+
+```
+pwsh -NoProfile -File .\tests\Run-Tests.ps1      # syntax + logic, any OS
+pwsh -NoProfile -File .\tests\Test-UiBuild.ps1   # builds the window, Windows only
+```
+
+`Run-Tests.ps1` dot-sources each tool with `-Mode FunctionsOnly`, so the logic is
+checked without a window opening. `Test-UiBuild.ps1` constructs every control with
+`-Mode BuildOnly` and never shows it, which is what makes it work on a CI runner.
+
+GitHub Actions runs both on Windows and the logic tests on Linux for every push and
+pull request, plus a check that no credential or local settings file was committed.
+
 ## Adding a tool
 
 1. `tools\<Tool-Name>\<Tool-Name>.ps1` - the tool
 2. `tools\<Tool-Name>\<Tool-Name>.bat` - a launcher matching the pattern in Map-NetworkDrive
 3. `tools\<Tool-Name>\README.md` - how to run it
 4. Add a row to the table above
+5. Add checks to `tests\Run-Tests.ps1` - CI picks them up with no workflow edit
 
 `Install-DesktopShortcut.ps1` picks up any new `.bat` automatically.
 
