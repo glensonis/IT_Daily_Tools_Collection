@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # Syntax check plus the logic tests. Runs on both platforms because the
+      # tool is dot-sourced with -Mode FunctionsOnly, which never touches WinForms.
+      - name: Syntax and logic tests
+        shell: pwsh
+        run: ./tests/Run-Tests.ps1
+
+      # Constructs every control for real. Windows only, since WinForms is not
+      # available on the Linux runner. The window is built but never shown.
+      - name: Window build smoke test
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/Test-UiBuild.ps1 -RequireWindows
+
+      # PSScriptAnalyzer catches what a parser will not: unused variables,
+      # aliases in scripts, shadowed built-ins, plain-text credential handling.
+      # Rules that do not fit a standalone interactive tool are turned off in
+      # PSScriptAnalyzerSettings.psd1 rather than ignored here, so the output
+      # stays short enough to read. Errors fail the build; warnings are listed.
+      - name: PSScriptAnalyzer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction Stop
+          $found = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1
+          if ($found) {
+            $found | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+          } else {
+            Write-Host 'Clean: no findings.'
+          }
+          $errors = @($found | Where-Object Severity -eq 'Error')
+          if ($errors.Count -gt 0) {
+            Write-Host "$($errors.Count) error-level finding(s)." -ForegroundColor Red
+            exit 1
+          }
+          Write-Host 'No error-level findings.'
+
+  secrets:
+    name: No committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # The repo is meant to hold no credentials and no real server names.
+      # settings.json and recent.json are git-ignored; this fails the build if
+      # one is ever committed anyway.
+      - name: Check for ignored files that slipped in
+        run: |
+          set -e
+          bad=0
+          for f in $(git ls-files); do
+            case "$f" in
+              *settings.json)
+                if [ "$(basename "$f")" != "settings.sample.json" ]; then
+                  echo "::error file=$f::local settings must not be committed"; bad=1
+                fi ;;
+              *recent.json|*.pwd|*.cred|*.rdp)
+                echo "::error file=$f::credential or cache file must not be committed"; bad=1 ;;
+            esac
+          done
+          exit $bad
+
+      - name: Check for hardcoded credentials
+        run: |
+          set -e
+          if git grep -nEi '(password|passwd|pwd)[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'$]' -- '*.ps1' '*.bat' '*.json'; then
+            echo "::error::a literal credential appears to be committed"
+            exit 1
+          fi
+          echo "No hardcoded credentials found."
