@@ -136,7 +136,9 @@ function Add-RecentPath {
         $list = @($list | Select-Object -First 10)
         ($list | ConvertTo-Json) | Set-Content -LiteralPath $RecentPath -Encoding UTF8
     } catch {
-        # A missing MRU cache is never worth failing the mapping over.
+        # A missing MRU cache is never worth failing the mapping over, but the
+        # reason should still be discoverable with -Verbose.
+        Write-Verbose "Could not update the recent-paths cache: $($_.Exception.Message)"
     }
 }
 
@@ -150,7 +152,11 @@ function Get-UsedDriveLetters {
         foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
             $used[$d.Name.Substring(0, 1).ToUpper()] = $d.DriveType.ToString()
         }
-    } catch { }
+    } catch {
+        # An unreadable drive should not stop the picker from being shown; the
+        # letter simply appears available.
+        Write-Verbose "Could not enumerate drives: $($_.Exception.Message)"
+    }
     return $used
 }
 

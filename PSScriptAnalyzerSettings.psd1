@@ -4,6 +4,11 @@
 # the default rules do not apply. Everything else stays on, including the
 # security rules.
 @{
+    # Information-level findings are style chatter (positional parameters in a
+    # test file's own assertion helper, and similar). They buried the actual
+    # test output in the CI log, so only real findings are reported.
+    Severity = @('Warning', 'Error')
+
     ExcludeRules = @(
         # These tools talk to the person sitting in front of them. Console output
         # is the point, and Write-Output would pollute the return values that
