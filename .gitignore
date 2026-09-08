@@ -1,0 +1,26 @@
+# --- secrets and local config (never commit) ---
+settings.json
+credentials.json
+*.pwd
+*.cred
+*.rdp
+recent.json
+cmdkey-*.txt
+
+# --- logs and temp ---
+*.log
+*.tmp
+*.bak
+*.swp
+
+# --- Windows shell junk ---
+Thumbs.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# --- editors ---
+.vscode/
+.idea/
+*.code-workspace

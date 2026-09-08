@@ -1,0 +1,24 @@
+{
+  "_comment": "Copy this file to settings.json and edit it. settings.json is git-ignored. Never put a password in here.",
+
+  "defaultDriveLetter": "Z",
+  "defaultUsername": "",
+  "defaultPersistent": true,
+  "openExplorerOnSuccess": true,
+  "saveCredential": true,
+
+  "presets": [
+    {
+      "name": "Example file server",
+      "path": "\\\\fileserver\\accounts",
+      "letter": "S",
+      "username": ""
+    },
+    {
+      "name": "Example second share",
+      "path": "\\\\fileserver\\shared",
+      "letter": "T",
+      "username": ""
+    }
+  ]
+}
