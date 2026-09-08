@@ -13,11 +13,19 @@
 #>
 
 [CmdletBinding()]
-param()
+param(
+    # Fail instead of skipping when not on Windows. CI passes this so a runner
+    # that somehow reports the wrong OS cannot turn a skipped test into a pass.
+    [switch] $RequireWindows
+)
 
 $ErrorActionPreference = 'Stop'
 
 if (-not $IsWindows) {
+    if ($RequireWindows) {
+        Write-Host 'FAIL  -RequireWindows was set but this is not Windows' -ForegroundColor Red
+        exit 1
+    }
     Write-Host 'SKIP  not Windows, WinForms unavailable'
     exit 0
 }

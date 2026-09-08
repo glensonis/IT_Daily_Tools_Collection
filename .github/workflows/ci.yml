@@ -33,19 +33,30 @@ jobs:
       - name: Window build smoke test
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./tests/Test-UiBuild.ps1
+        run: ./tests/Test-UiBuild.ps1 -RequireWindows
 
-      # PSScriptAnalyzer catches the things a parser will not: unapproved verbs,
-      # unused variables, aliases in scripts. Advisory for now.
+      # PSScriptAnalyzer catches what a parser will not: unused variables,
+      # aliases in scripts, shadowed built-ins, plain-text credential handling.
+      # Rules that do not fit a standalone interactive tool are turned off in
+      # PSScriptAnalyzerSettings.psd1 rather than ignored here, so the output
+      # stays short enough to read. Errors fail the build; warnings are listed.
       - name: PSScriptAnalyzer
         if: runner.os == 'Windows'
         shell: pwsh
-        continue-on-error: true
         run: |
           Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction Stop
-          $found = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error
-          if ($found) { $found | Format-Table -AutoSize | Out-String | Write-Host }
-          else { Write-Host 'No warnings or errors.' }
+          $found = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1
+          if ($found) {
+            $found | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+          } else {
+            Write-Host 'Clean: no findings.'
+          }
+          $errors = @($found | Where-Object Severity -eq 'Error')
+          if ($errors.Count -gt 0) {
+            Write-Host "$($errors.Count) error-level finding(s)." -ForegroundColor Red
+            exit 1
+          }
+          Write-Host 'No error-level findings.'
 
   secrets:
     name: No committed secrets

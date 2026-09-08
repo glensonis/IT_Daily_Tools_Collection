@@ -162,7 +162,12 @@ Test-Section 'net.exe / cmdkey.exe argument construction'
 
 # Stub the process launcher so the arguments can be inspected without running
 # anything. This is the whole point of routing through Invoke-Console.
-function Invoke-Console { param($FilePath, $Arguments) [pscustomobject]@{ ExitCode = 0; Output = $Arguments } }
+function Invoke-Console {
+    param($FilePath, $Arguments)
+    # $FilePath is captured so the stub matches the real signature; only the
+    # argument string is under test here.
+    [pscustomobject]@{ ExitCode = 0; Output = $Arguments; FilePath = $FilePath }
+}
 
 Assert-Equal 'map with credentials' `
     (New-Mapping -Letter 'Z' -Path '\\srv\my share' -UserName 'CORP\js' -Password 'p@ss w' -Persistent $true).Output `

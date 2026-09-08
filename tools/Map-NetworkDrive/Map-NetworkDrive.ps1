@@ -323,6 +323,14 @@ function Remove-Mapping {
 }
 
 function New-Mapping {
+    # net.exe takes the password as a command-line string, so a SecureString or
+    # PSCredential would have to be unwrapped right here to build the argument
+    # list. Carrying one would look safer without being safer. The real exposure
+    # is the argument list itself, which is documented in the tool README.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingUsernameAndPasswordParams', '',
+        Justification = 'net.exe requires plain text; a credential object would be unwrapped here anyway.')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', 'Password',
+        Justification = 'net.exe requires plain text; a credential object would be unwrapped here anyway.')]
     param(
         [string] $Letter,
         [string] $Path,
@@ -341,6 +349,11 @@ function New-Mapping {
 }
 
 function Save-ServerCredential {
+    # Same as New-Mapping: cmdkey.exe takes /pass: as a command-line string.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingUsernameAndPasswordParams', '',
+        Justification = 'cmdkey.exe requires plain text; a credential object would be unwrapped here anyway.')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', 'Password',
+        Justification = 'cmdkey.exe requires plain text; a credential object would be unwrapped here anyway.')]
     param([string] $Server, [string] $UserName, [string] $Password)
 
     if (-not $Server -or -not $UserName) { return $null }
@@ -465,7 +478,7 @@ $txtLog.ScrollBars = 'Vertical'
 $txtLog.BackColor  = [System.Drawing.Color]::White
 $form.Controls.Add($txtLog)
 
-function Write-Log {
+function Add-LogLine {
     param([string] $Message)
     $stamp = (Get-Date).ToString('HH:mm:ss')
     $txtLog.AppendText("[$stamp] $Message`r`n")
@@ -533,9 +546,9 @@ $cboPath.Add_SelectedIndexChanged({
     }
 })
 
-Write-Log 'Ready. Pick a drive letter and a network folder, then click Map Drive.'
+Add-LogLine 'Ready. Pick a drive letter and a network folder, then click Map Drive.'
 if ($presets.Count -gt 0) {
-    Write-Log "Loaded $($presets.Count) preset path(s) from settings."
+    Add-LogLine "Loaded $($presets.Count) preset path(s) from settings."
 }
 
 # --------------------------------------------------------------------------
@@ -545,7 +558,7 @@ if ($presets.Count -gt 0) {
 $btnRefresh.Add_Click({
     Update-LetterList
     Update-PathList
-    Write-Log 'Drive letter list refreshed.'
+    Add-LogLine 'Drive letter list refreshed.'
 })
 
 $btnClose.Add_Click({ $form.Close() })
@@ -559,12 +572,12 @@ $btnDisconnect.Add_Click({
         [System.Windows.Forms.MessageBoxIcon]::Question)
     if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { return }
 
-    Write-Log "Disconnecting $letter`: ..."
+    Add-LogLine "Disconnecting $letter`: ..."
     $result = Remove-Mapping -Letter $letter
     if ($result.ExitCode -eq 0) {
-        Write-Log "Drive $letter`: disconnected."
+        Add-LogLine "Drive $letter`: disconnected."
     } else {
-        Write-Log "Could not disconnect $letter`: $(Resolve-NetError $result.Output)"
+        Add-LogLine "Could not disconnect $letter`: $(Resolve-NetError $result.Output)"
     }
     Update-LetterList -Select $letter
 })
@@ -592,7 +605,7 @@ $btnMap.Add_Click({
             [System.Windows.Forms.MessageBoxButtons]::YesNo,
             [System.Windows.Forms.MessageBoxIcon]::Warning)
         if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) {
-            Write-Log 'Cancelled. Nothing was changed.'
+            Add-LogLine 'Cancelled. Nothing was changed.'
             return
         }
     }
@@ -601,30 +614,30 @@ $btnMap.Add_Click({
     $form.Cursor    = [System.Windows.Forms.Cursors]::WaitCursor
     try {
         $server = Get-ServerName $path
-        Write-Log "Checking that $server is reachable ..."
+        Add-LogLine "Checking that $server is reachable ..."
         if (-not (Test-ServerReachable -Server $server)) {
-            Write-Log "WARNING: no answer from $server on port 445 (file sharing)."
-            Write-Log 'The server may be off, or you may be off the office network / VPN. Trying anyway.'
+            Add-LogLine "WARNING: no answer from $server on port 445 (file sharing)."
+            Add-LogLine 'The server may be off, or you may be off the office network / VPN. Trying anyway.'
         } else {
-            Write-Log "$server answered."
+            Add-LogLine "$server answered."
         }
 
-        Write-Log "Clearing any old mapping on $letter`: ..."
+        Add-LogLine "Clearing any old mapping on $letter`: ..."
         Remove-Mapping -Letter $letter | Out-Null
 
-        Write-Log "Mapping $letter`: to $path ..."
+        Add-LogLine "Mapping $letter`: to $path ..."
         $result = New-Mapping -Letter $letter -Path $path -UserName $user -Password $pass -Persistent $chkPersist.Checked
 
         if ($result.ExitCode -eq 0) {
-            Write-Log "SUCCESS. $letter`: is now $path"
+            Add-LogLine "SUCCESS. $letter`: is now $path"
             Add-RecentPath -Path $path
 
             if ($chkSaveCred.Checked -and $user) {
                 $cred = Save-ServerCredential -Server $server -UserName $user -Password $pass
                 if ($cred -and $cred.ExitCode -eq 0) {
-                    Write-Log "Credential saved in Windows Credential Manager for $server."
+                    Add-LogLine "Credential saved in Windows Credential Manager for $server."
                 } else {
-                    Write-Log 'Drive mapped, but the credential could not be saved. That is not fatal.'
+                    Add-LogLine 'Drive mapped, but the credential could not be saved. That is not fatal.'
                 }
             }
 
@@ -637,7 +650,7 @@ $btnMap.Add_Click({
             }
         } else {
             $msg = Resolve-NetError $result.Output
-            Write-Log "FAILED: $msg"
+            Add-LogLine "FAILED: $msg"
             [System.Windows.Forms.MessageBox]::Show(
                 $msg,
                 'Could not map the drive',
@@ -647,7 +660,7 @@ $btnMap.Add_Click({
             $txtPass.SelectAll()
         }
     } catch {
-        Write-Log "Unexpected error: $($_.Exception.Message)"
+        Add-LogLine "Unexpected error: $($_.Exception.Message)"
     } finally {
         $form.Cursor    = [System.Windows.Forms.Cursors]::Default
         $btnMap.Enabled = $true
